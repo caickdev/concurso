@@ -1,0 +1,42 @@
+# Infraestrutura local de desenvolvimento — Postgres com pgvector já
+# compilado (evita a dor de compilar a extensão manualmente no Windows) e
+# Redis. Não é a topologia de produção (lá o Postgres deve ter um PgBouncer
+# na frente — ver backend/database.py e o .env.example da raiz).
+#
+# Uso:
+#   docker compose up -d
+#   cd backend && alembic upgrade head
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: concursos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

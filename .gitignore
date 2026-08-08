@@ -1,0 +1,21 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Segredos locais — nunca commitar, apenas os .env.example
+.env
+backend/.env
+
+# Vercel
+.vercel/
+
+# Editores / SO
+.vscode/
+.idea/
+Thumbs.db

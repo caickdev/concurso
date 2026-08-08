@@ -1,0 +1,4 @@
+# A Vercel procura requirements.txt na raiz do projeto (Root Directory) para
+# instalar as dependências das Serverless Functions em /api. O conteúdo real
+# vive em backend/requirements.txt (fonte única também usada localmente/Docker).
+-r backend/requirements.txt
