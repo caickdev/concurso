@@ -1,0 +1,40 @@
+# Duplicata proposital de requirements.txt (raiz) e backend/requirements.txt.
+# O runtime Python da Vercel, quando o entrypoint (index.py) importa código
+# de fora da própria pasta /api (aqui, backend/), só empacota corretamente as
+# dependências na função se o requirements.txt também estiver dentro de /api
+# — o da raiz sozinho não bastou (build passa, mas a função crasha em runtime
+# com "ModuleNotFoundError: No module named 'fastapi'"). Mantenha as três
+# cópias em sincronia ao mudar uma dependência.
+
+# --- Framework & Servidor ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# --- Banco de Dados ---
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+alembic==1.13.2
+pgvector==0.3.4
+
+# --- Cache & Rate Limiting ---
+redis==5.0.8
+slowapi==0.1.9
+
+# --- Segurança ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+bleach==6.1.0
+
+# --- Configuração & Validação ---
+pydantic==2.9.2
+pydantic-settings==2.5.2
+email-validator==2.2.0
+
+# --- Scraping / ETL ---
+httpx==0.27.2
+beautifulsoup4==4.12.3
+playwright==1.47.0
+
+# --- Tutor IA ---
+anthropic==0.34.2
