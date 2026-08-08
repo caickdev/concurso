@@ -72,7 +72,7 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook }) 
   const answered = result !== null;
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <article className="rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-sm sm:px-6 dark:border-slate-800 dark:bg-slate-900">
       <header className="mb-4 flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded-full bg-brand-50 px-2.5 py-1 font-medium text-brand-700 dark:bg-brand-700/20 dark:text-brand-300">
           {question.board?.name}
@@ -90,7 +90,7 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook }) 
         </span>
       </header>
 
-      <p className="mb-4 whitespace-pre-line text-sm leading-relaxed text-slate-800 dark:text-slate-100">
+      <p className="mb-4 whitespace-pre-line break-words text-sm leading-relaxed text-slate-800 dark:text-slate-100">
         {question.content}
       </p>
 
@@ -127,7 +127,7 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook }) 
       {error && <p className="mb-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
 
       {!answered ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
@@ -141,7 +141,7 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook }) 
             type="button"
             onClick={handleSubmit}
             disabled={!selectedOption || submitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             Responder
@@ -157,11 +157,11 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook }) 
             <span className="text-slate-500 dark:text-slate-400">Sequência: {result.current_streak} dias</span>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap">
             <button
               type="button"
               onClick={() => onAddToNotebook?.(question.id)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <BookmarkPlus className="h-4 w-4" /> Caderno de erros
             </button>
@@ -169,7 +169,7 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook }) 
               type="button"
               onClick={handleExplainAI}
               disabled={loadingExplanation}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700/40 dark:text-brand-300 dark:hover:bg-brand-700/10"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700/40 dark:text-brand-300 dark:hover:bg-brand-700/10"
             >
               {loadingExplanation ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -178,13 +178,13 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook }) 
               )}
               Explicar com IA
             </button>
-            <span className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
               <MessageSquare className="h-4 w-4" /> Comentários
             </span>
           </div>
 
           {explanation && (
-            <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <div className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               <pre className="whitespace-pre-wrap font-sans">{explanation}</pre>
             </div>
           )}

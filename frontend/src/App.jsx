@@ -61,7 +61,7 @@ export default function App() {
           <Loader2 className="h-5 w-5 animate-spin" /> Carregando...
         </div>
       ) : user ? (
-        <div className="flex">
+        <div className="flex flex-col md:flex-row">
           <Sidebar
             user={user}
             activeView={view}
@@ -70,7 +70,7 @@ export default function App() {
             theme={theme}
             onToggleTheme={toggleTheme}
           />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
             {view === "dashboard" && <StudentDashboard user={user} onUserChange={setUser} />}
             {view === "notebook" && <NotebookPage />}
             {view === "profile" && <ProfilePage user={user} onUserChange={setUser} />}

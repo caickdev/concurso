@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Flame, ListFilter, Loader2, Target, Trophy } from "lucide-react";
+import { ChevronDown, Flame, ListFilter, Loader2, Target, Trophy } from "lucide-react";
 import { api } from "../api/client";
 import QuestionCard from "./QuestionCard.jsx";
 
@@ -35,6 +35,7 @@ export default function StudentDashboard({ user, onUserChange }) {
   const [questionPage, setQuestionPage] = useState(null);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [error, setError] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     api.leaderboard.get(5).then(setLeaderboard).catch(() => setLeaderboard([]));
@@ -109,10 +110,19 @@ export default function StudentDashboard({ user, onUserChange }) {
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-          <ListFilter className="h-4 w-4" /> Filtros
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-2 text-sm font-medium text-slate-700 dark:text-slate-200 md:pointer-events-none"
+        >
+          <span className="flex items-center gap-2">
+            <ListFilter className="h-4 w-4" /> Filtros
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform md:hidden ${filtersOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+        <div className={`mt-3 grid-cols-2 gap-3 sm:grid-cols-4 md:grid ${filtersOpen ? "grid" : "hidden"}`}>
           <select
             value={filters.subject_id}
             onChange={(e) => updateFilter("subject_id", e.target.value)}
