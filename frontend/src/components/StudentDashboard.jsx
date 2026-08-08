@@ -14,8 +14,7 @@ const DIFFICULTY_OPTIONS = [
  * Painel principal do aluno: estatísticas de gamificação, filtros avançados
  * de questões e a lista de questões filtradas/paginadas.
  */
-export default function StudentDashboard() {
-  const [user, setUser] = useState(null);
+export default function StudentDashboard({ user, onUserChange }) {
   const [leaderboard, setLeaderboard] = useState([]);
 
   const [filters, setFilters] = useState({
@@ -32,7 +31,6 @@ export default function StudentDashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.auth.me().then(setUser).catch(() => setUser(null));
     api.leaderboard.get(5).then(setLeaderboard).catch(() => setLeaderboard([]));
   }, []);
 
@@ -69,7 +67,7 @@ export default function StudentDashboard() {
   };
 
   const handleAnswered = (result) => {
-    setUser((prev) =>
+    onUserChange((prev) =>
       prev ? { ...prev, total_xp: result.total_xp, current_streak: result.current_streak } : prev
     );
   };
