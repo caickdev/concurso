@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 from backend.core.config import settings
 from backend.core.rate_limit import limiter
@@ -36,9 +35,15 @@ app = FastAPI(
 )
 
 # --- Rate Limiting (SlowAPI + Redis) ---
+# Sem SlowAPIMiddleware de propósito: seu dispatch() lê
+# request.state.view_rate_limit incondicionalmente ao montar a resposta,
+# o que quebra (AttributeError) quando swallow_errors=True pula a checagem
+# de limite por Redis indisponível. Os decorators @limiter.limit(...) nas
+# rotas sensíveis (login, resposta, IA) funcionam via Depends do FastAPI,
+# independente deste middleware — só o limite padrão global implícito
+# (default_limits, sem decorator explícito) deixa de ser aplicado.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
 
 # --- CORS ---
 # `allow_origins` cobre domínios fixos (dev local, domínio de produção
