@@ -1,12 +1,25 @@
 import { useEffect, useState } from "react";
-import { LogOut, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { api } from "./api/client";
+import { useTheme } from "./hooks/useTheme";
 import AuthForm from "./components/AuthForm.jsx";
+import ResetPasswordForm from "./components/ResetPasswordForm.jsx";
+import Sidebar from "./components/Sidebar.jsx";
 import StudentDashboard from "./components/StudentDashboard.jsx";
+import NotebookPage from "./components/NotebookPage.jsx";
+import ProfilePage from "./components/ProfilePage.jsx";
+
+function getResetTokenFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("token");
+}
 
 export default function App() {
+  const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [view, setView] = useState("dashboard");
+  const [resetToken, setResetToken] = useState(getResetTokenFromUrl);
 
   useEffect(() => {
     api.auth
@@ -21,35 +34,47 @@ export default function App() {
       await api.auth.logout();
     } finally {
       setUser(null);
+      setView("dashboard");
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-800">
-          Plataforma de Questões para Concursos
-        </h1>
-        {user && (
-          <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span>Olá, {user.full_name.split(" ")[0]}</span>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              <LogOut className="h-3.5 w-3.5" /> Sair
-            </button>
-          </div>
-        )}
-      </header>
+  const clearResetToken = () => {
+    setResetToken(null);
+    window.history.replaceState({}, "", window.location.pathname);
+  };
 
+  // O link de e-mail leva para "/?token=...": essa tela tem prioridade sobre
+  // qualquer outra, autenticado ou não.
+  if (resetToken) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <ResetPasswordForm token={resetToken} onDone={clearResetToken} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {checkingSession ? (
-        <div className="flex min-h-[70vh] items-center justify-center gap-2 text-slate-500">
+        <div className="flex min-h-screen items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
           <Loader2 className="h-5 w-5 animate-spin" /> Carregando...
         </div>
       ) : user ? (
-        <StudentDashboard user={user} onUserChange={setUser} />
+        <div className="flex">
+          <Sidebar
+            user={user}
+            activeView={view}
+            onNavigate={setView}
+            onLogout={handleLogout}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
+          <main className="flex-1 overflow-y-auto">
+            {view === "dashboard" && <StudentDashboard user={user} onUserChange={setUser} />}
+            {view === "notebook" && <NotebookPage />}
+            {view === "profile" && <ProfilePage user={user} onUserChange={setUser} />}
+          </main>
+        </div>
       ) : (
         <AuthForm onAuthenticated={setUser} />
       )}

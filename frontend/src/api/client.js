@@ -50,6 +50,8 @@ export const api = {
     login: (payload) => request("/auth/login", { method: "POST", body: payload }),
     logout: () => request("/auth/logout", { method: "POST" }),
     me: () => request("/auth/me"),
+    forgotPassword: (payload) => request("/auth/forgot-password", { method: "POST", body: payload }),
+    resetPassword: (payload) => request("/auth/reset-password", { method: "POST", body: payload }),
   },
   users: {
     updateMe: (payload) => request("/users/me", { method: "PATCH", body: payload }),
@@ -79,6 +81,11 @@ export const api = {
   },
   leaderboard: {
     get: (limit = 50) => request("/leaderboard", { params: { limit } }),
+  },
+  taxonomy: {
+    subjects: () => request("/subjects"),
+    boards: () => request("/boards"),
+    states: () => request("/states"),
   },
 };
 

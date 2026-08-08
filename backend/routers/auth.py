@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import settings
@@ -10,9 +12,18 @@ from backend.core.security import (
     set_auth_cookie,
     verify_password,
 )
+from backend.crud import crud_password_reset
 from backend.crud.crud_user import crud_user
 from backend.database import get_db
-from backend.schemas.user import TokenResponse, UserCreate, UserLogin, UserRead
+from backend.schemas.user import (
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+    UserRead,
+)
+from backend.services.email_service import build_password_reset_email, send_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -65,3 +76,62 @@ async def read_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
     return user
+
+
+async def _send_reset_email(email: str, raw_token: str) -> None:
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
+    if settings.DEBUG:
+        # Só em desenvolvimento: permite testar o fluxo completo sem precisar
+        # de RESEND_API_KEY configurada. Nunca loga em produção (DEBUG=false).
+        logging.getLogger("auth").info("[DEBUG] Link de redefinição: %s", reset_url)
+    await send_email(
+        to=email,
+        subject="Redefinição de senha — Plataforma de Questões para Concursos",
+        html=build_password_reset_email(reset_url=reset_url),
+    )
+
+
+@router.post("/forgot-password", response_model=TokenResponse)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Sempre responde com sucesso genérico, exista ou não o e-mail — evita
+    que a rota seja usada para descobrir quais e-mails estão cadastrados."""
+    user = await crud_user.get_by_email(db, payload.email.lower())
+    if user is not None and user.is_active:
+        raw_token = await crud_password_reset.create_reset_token(db, user)
+        background_tasks.add_task(_send_reset_email, user.email, raw_token)
+
+    return TokenResponse(
+        message="Se o e-mail estiver cadastrado, você receberá um link de redefinição em instantes."
+    )
+
+
+@router.post("/reset-password", response_model=TokenResponse)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+async def reset_password(
+    request: Request,
+    payload: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    entry = await crud_password_reset.get_valid_token(db, payload.token)
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Link de redefinição inválido ou expirado. Solicite um novo.",
+        )
+
+    user = await crud_user.get(db, entry.user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Link de redefinição inválido."
+        )
+
+    await crud_password_reset.consume_token_and_reset_password(
+        db, entry, user, payload.new_password
+    )
+    return TokenResponse(message="Senha redefinida com sucesso. Faça login com a nova senha.")

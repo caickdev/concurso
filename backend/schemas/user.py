@@ -69,6 +69,24 @@ class TokenResponse(BaseModel):
     message: str = "Autenticado com sucesso."
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=_PASSWORD_MIN_LEN, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not _PASSWORD_UPPER_RE.search(v):
+            raise ValueError("A senha deve conter ao menos uma letra maiúscula.")
+        if not _PASSWORD_DIGIT_RE.search(v):
+            raise ValueError("A senha deve conter ao menos um dígito.")
+        return v
+
+
 class LeaderboardEntry(BaseModel):
     rank: int
     user_id: uuid.UUID

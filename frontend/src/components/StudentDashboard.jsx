@@ -10,12 +10,18 @@ const DIFFICULTY_OPTIONS = [
   { value: "HARD", label: "Difícil" },
 ];
 
+const SELECT_CLASSES =
+  "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+
 /**
  * Painel principal do aluno: estatísticas de gamificação, filtros avançados
- * de questões e a lista de questões filtradas/paginadas.
+ * de questões (matéria, banca, ano, dificuldade) e a lista de questões
+ * filtradas/paginadas.
  */
 export default function StudentDashboard({ user, onUserChange }) {
   const [leaderboard, setLeaderboard] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [boards, setBoards] = useState([]);
 
   const [filters, setFilters] = useState({
     subject_id: "",
@@ -32,6 +38,8 @@ export default function StudentDashboard({ user, onUserChange }) {
 
   useEffect(() => {
     api.leaderboard.get(5).then(setLeaderboard).catch(() => setLeaderboard([]));
+    api.taxonomy.subjects().then(setSubjects).catch(() => setSubjects([]));
+    api.taxonomy.boards().then(setBoards).catch(() => setBoards([]));
   }, []);
 
   useEffect(() => {
@@ -100,22 +108,46 @@ export default function StudentDashboard({ user, onUserChange }) {
         />
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
           <ListFilter className="h-4 w-4" /> Filtros
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <select
+            value={filters.subject_id}
+            onChange={(e) => updateFilter("subject_id", e.target.value)}
+            className={SELECT_CLASSES}
+          >
+            <option value="">Todas as matérias</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filters.board_id}
+            onChange={(e) => updateFilter("board_id", e.target.value)}
+            className={SELECT_CLASSES}
+          >
+            <option value="">Todas as bancas</option>
+            {boards.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
           <input
             type="number"
             placeholder="Ano"
             value={filters.year}
             onChange={(e) => updateFilter("year", e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            className={SELECT_CLASSES}
           />
           <select
             value={filters.difficulty_level}
             onChange={(e) => updateFilter("difficulty_level", e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            className={SELECT_CLASSES}
           >
             {DIFFICULTY_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -128,11 +160,11 @@ export default function StudentDashboard({ user, onUserChange }) {
 
       <section className="space-y-4">
         {loadingQuestions && (
-          <div className="flex items-center justify-center gap-2 py-10 text-slate-500">
+          <div className="flex items-center justify-center gap-2 py-10 text-slate-500 dark:text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" /> Carregando questões...
           </div>
         )}
-        {error && <p className="text-sm text-rose-600">{error}</p>}
+        {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         {!loadingQuestions &&
           questionPage?.items?.map((question) => (
             <QuestionCard
@@ -143,7 +175,7 @@ export default function StudentDashboard({ user, onUserChange }) {
             />
           ))}
         {!loadingQuestions && questionPage?.items?.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-500">
+          <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
             Nenhuma questão encontrada para os filtros selecionados.
           </p>
         )}
@@ -154,34 +186,34 @@ export default function StudentDashboard({ user, onUserChange }) {
           <button
             disabled={filters.page <= 1}
             onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-40"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
           >
             Anterior
           </button>
-          <span className="px-2 py-1.5 text-sm text-slate-500">
+          <span className="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">
             Página {filters.page} de {questionPage.total_pages}
           </span>
           <button
             disabled={filters.page >= questionPage.total_pages}
             onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-40"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
           >
             Próxima
           </button>
         </div>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
           <Trophy className="h-4 w-4 text-amber-500" /> Ranking
         </div>
         <ol className="space-y-1.5 text-sm">
           {leaderboard.map((entry) => (
-            <li key={entry.user_id} className="flex justify-between text-slate-600">
+            <li key={entry.user_id} className="flex justify-between text-slate-600 dark:text-slate-300">
               <span>
                 {entry.rank}. {entry.full_name}
               </span>
-              <span className="font-medium text-slate-800">{entry.total_xp} XP</span>
+              <span className="font-medium text-slate-800 dark:text-slate-100">{entry.total_xp} XP</span>
             </li>
           ))}
         </ol>
@@ -192,11 +224,11 @@ export default function StudentDashboard({ user, onUserChange }) {
 
 function StatCard({ icon, label, value }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
-      <div className="rounded-lg bg-slate-50 p-2">{icon}</div>
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800">{icon}</div>
       <div>
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="text-lg font-semibold text-slate-800">{value}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">{value}</p>
       </div>
     </div>
   );

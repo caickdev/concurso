@@ -61,6 +61,16 @@ class Settings(BaseSettings):
     COOKIE_SAMESITE: str = "strict"
     COOKIE_DOMAIN: str | None = None
 
+    # --- Redefinição de senha ---
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+    # URL do frontend usada para montar o link enviado por e-mail
+    # (ex.: https://concurso-mphb.vercel.app). Sem barra no final.
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # --- E-mail transacional (Resend) ---
+    RESEND_API_KEY: str = Field(default="", description="Chave da API do Resend para envio de e-mails")
+    EMAIL_FROM: str = "Plataforma de Concursos <onboarding@resend.dev>"
+
     # --- CORS ---
     # Armazenado como string bruta "a,b,c" — se declarado List[str] direto,
     # pydantic-settings tenta json.loads() no valor da env var antes de

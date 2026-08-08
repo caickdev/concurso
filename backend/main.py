@@ -12,7 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from backend.core.config import settings
 from backend.core.rate_limit import limiter
 from backend.database import dispose_engine
-from backend.routers import admin, auth, comments, leaderboard, questions, users
+from backend.routers import admin, auth, comments, leaderboard, questions, taxonomy, users
 
 logging.basicConfig(level=logging.INFO if not settings.DEBUG else logging.DEBUG)
 logger = logging.getLogger("main")
@@ -87,6 +87,7 @@ app.include_router(questions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(comments.router, prefix=settings.API_V1_PREFIX)
 app.include_router(leaderboard.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
+app.include_router(taxonomy.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")
