@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import settings
@@ -96,15 +96,19 @@ async def _send_reset_email(email: str, raw_token: str) -> None:
 async def forgot_password(
     request: Request,
     payload: ForgotPasswordRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """Sempre responde com sucesso genérico, exista ou não o e-mail — evita
-    que a rota seja usada para descobrir quais e-mails estão cadastrados."""
+    que a rota seja usada para descobrir quais e-mails estão cadastrados.
+
+    O envio do e-mail é aguardado aqui mesmo (não via BackgroundTasks):
+    em runtime serverless (Vercel Functions), a função pode ser congelada
+    assim que a resposta HTTP é enviada, sem garantir que uma tarefa em
+    segundo plano agendada para depois realmente chegue a rodar."""
     user = await crud_user.get_by_email(db, payload.email.lower())
     if user is not None and user.is_active:
         raw_token = await crud_password_reset.create_reset_token(db, user)
-        background_tasks.add_task(_send_reset_email, user.email, raw_token)
+        await _send_reset_email(user.email, raw_token)
 
     return TokenResponse(
         message="Se o e-mail estiver cadastrado, você receberá um link de redefinição em instantes."
