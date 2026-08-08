@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -107,3 +107,46 @@ class AIExplanationResponse(BaseModel):
     question_id: uuid.UUID
     explanation_markdown: str
     generated_at: datetime
+
+
+class RawQuestionPayload(BaseModel):
+    """Formato intermediário compartilhado por todos os caminhos de ingestão
+    de questões (scraper, POST /questions/batch, scripts/insert_questions.py)
+    — validado antes de resolver FKs (board/subject/exam/state) e antes de
+    gerar o hash de deduplicação."""
+    content: str = Field(min_length=1)
+    options: Dict[str, str]
+    correct_option: str
+    board_name: str = Field(min_length=1)
+    subject_name: str = Field(min_length=1)
+    organization: str = Field(min_length=1)
+    role: Optional[str] = None
+    year: int = Field(ge=1990, le=2100)
+    state_uf: Optional[str] = None
+    source_url: Optional[str] = None
+    difficulty_hint: Optional[str] = None  # ex.: "fácil", "difícil"
+    difficulty_level: Optional[DifficultyLevel] = None  # se informado, pula a heurística
+
+    @field_validator("options")
+    @classmethod
+    def validate_options(cls, v: Dict[str, str]) -> Dict[str, str]:
+        if len(v) < 2:
+            raise ValueError("Questão precisa de ao menos 2 alternativas.")
+        return v
+
+    @field_validator("correct_option")
+    @classmethod
+    def normalize_correct_option(cls, v: str) -> str:
+        return v.strip().upper()
+
+
+class QuestionBatchRequest(BaseModel):
+    questions: List[RawQuestionPayload] = Field(min_length=1, max_length=200)
+
+
+class QuestionBatchResult(BaseModel):
+    received: int
+    invalid: int
+    duplicates: int
+    inserted: int
+    errors: List[str] = Field(default_factory=list)

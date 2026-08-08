@@ -1,4 +1,4 @@
-import { BookMarked, LayoutDashboard, LogOut, Moon, Sun, User as UserIcon } from "lucide-react";
+import { BookMarked, LayoutDashboard, LogOut, Moon, ShieldPlus, Sun, User as UserIcon } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Questões", icon: LayoutDashboard },
@@ -8,8 +8,13 @@ const NAV_ITEMS = [
 
 /**
  * Barra lateral fixa: navegação entre telas, alternância de tema e logout.
+ * O item "Admin" só aparece para usuários com is_admin=true.
  */
 export default function Sidebar({ user, activeView, onNavigate, onLogout, theme, onToggleTheme }) {
+  const navItems = user?.is_admin
+    ? [...NAV_ITEMS, { key: "admin", label: "Cadastrar questão", icon: ShieldPlus }]
+    : NAV_ITEMS;
+
   return (
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
@@ -22,7 +27,7 @@ export default function Sidebar({ user, activeView, onNavigate, onLogout, theme,
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+        {navItems.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             type="button"

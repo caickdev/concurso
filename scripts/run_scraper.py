@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 from backend.database import dispose_engine
+from backend.services.cache import redis_client
 from backend.services.scraper_service import ScrapeResult, scraper_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -44,8 +45,12 @@ async def run(urls: list[str]) -> ScrapeResult:
     try:
         return await scraper_service.run(urls)
     finally:
-        # Processo de vida curta — libera as conexões do pool antes de sair.
+        # Processo de vida curta — libera as conexões do pool e do Redis
+        # antes de sair (sem isso, o finalizador do cliente Redis roda
+        # depois do event loop já fechado, gerando um RuntimeError
+        # cosmético no encerramento do script).
         await dispose_engine()
+        await redis_client.aclose()
 
 
 def main() -> int:

@@ -50,6 +50,7 @@ class UserRead(ORMModel):
     longest_streak: int
     last_active_date: date | None
     total_xp: int
+    is_admin: bool
     created_at: datetime
 
 

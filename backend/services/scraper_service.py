@@ -24,13 +24,14 @@ from typing import Any
 import bleach
 import httpx
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, ValidationError, field_validator
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import settings
 from backend.crud.crud_question import crud_question
 from backend.database import get_db_context
 from backend.models.question import DifficultyLevel
+from backend.schemas.question import RawQuestionPayload
 from backend.services import cache
 
 logger = logging.getLogger("scraper_service")
@@ -62,34 +63,6 @@ BRAZILIAN_STATE_NAMES: dict[str, str] = {
 }
 
 _ALLOWED_HTML_TAGS = ["b", "i", "u", "sup", "sub", "br", "p"]
-
-
-class RawQuestionPayload(BaseModel):
-    """Formato intermediário validado logo após a extração — antes de
-    resolver FKs (board/subject/exam/state) e antes de gerar o hash."""
-    content: str
-    options: dict[str, str]
-    correct_option: str
-    board_name: str
-    subject_name: str
-    organization: str
-    role: str | None = None
-    year: int
-    state_uf: str | None = None
-    source_url: str | None = None
-    difficulty_hint: str | None = None  # ex.: "fácil", "difícil", vindo da fonte
-
-    @field_validator("options")
-    @classmethod
-    def validate_options(cls, v: dict[str, str]) -> dict[str, str]:
-        if len(v) < 2:
-            raise ValueError("Questão precisa de ao menos 2 alternativas.")
-        return v
-
-    @field_validator("correct_option")
-    @classmethod
-    def normalize_correct_option(cls, v: str) -> str:
-        return v.strip().upper()
 
 
 @dataclass
@@ -214,6 +187,76 @@ def _parse_question_page(html: str, source_url: str) -> RawQuestionPayload | Non
     return payload
 
 
+async def resolve_foreign_keys(
+    db: AsyncSession, payload: RawQuestionPayload
+) -> dict[str, Any] | None:
+    """Resolve (ou cria) Board/Subject/Exam/State a partir dos nomes textuais
+    do payload, retornando os IDs necessários para montar uma Question.
+    Compartilhada por todos os caminhos de ingestão: scraper, POST
+    /questions/batch e scripts/insert_questions.py."""
+    from sqlalchemy import select
+
+    from backend.models.taxonomy import Board, Exam, State, Subject
+
+    board_slug = normalize_board_name(payload.board_name)
+    if not board_slug or not payload.subject_name or not payload.organization:
+        return None
+
+    board = (
+        await db.execute(select(Board).where(Board.slug == board_slug))
+    ).scalar_one_or_none()
+    if board is None:
+        board = Board(name=payload.board_name.strip(), slug=board_slug, aliases=[board_slug])
+        db.add(board)
+        await db.flush()
+
+    subject_slug = _strip_accents(payload.subject_name.strip().lower()).replace(" ", "-")
+    subject = (
+        await db.execute(select(Subject).where(Subject.slug == subject_slug))
+    ).scalar_one_or_none()
+    if subject is None:
+        subject = Subject(name=payload.subject_name.strip(), slug=subject_slug)
+        db.add(subject)
+        await db.flush()
+
+    exam = (
+        await db.execute(
+            select(Exam).where(
+                Exam.organization == payload.organization,
+                Exam.year == payload.year,
+                Exam.role == payload.role,
+            )
+        )
+    ).scalar_one_or_none()
+    if exam is None:
+        exam = Exam(
+            name=f"{payload.organization} {payload.year}",
+            organization=payload.organization.strip(),
+            role=payload.role,
+            year=payload.year,
+        )
+        db.add(exam)
+        await db.flush()
+
+    state_id = None
+    if payload.state_uf:
+        uf = payload.state_uf.strip().upper()
+        state = (await db.execute(select(State).where(State.uf == uf))).scalar_one_or_none()
+        if state is None and uf in BRAZILIAN_STATE_NAMES:
+            state = State(name=BRAZILIAN_STATE_NAMES[uf], uf=uf)
+            db.add(state)
+            await db.flush()
+        if state is not None:
+            state_id = state.id
+
+    return {
+        "board_id": board.id,
+        "subject_id": subject.id,
+        "exam_id": exam.id,
+        "state_id": state_id,
+    }
+
+
 class ScraperService:
     def __init__(self, concurrency: int | None = None):
         self._semaphore = asyncio.Semaphore(concurrency or settings.SCRAPER_CONCURRENCY)
@@ -227,74 +270,6 @@ class ScraperService:
             except httpx.HTTPError as exc:
                 logger.warning("Falha ao buscar %s: %s", url, exc)
                 return None
-
-    async def _resolve_foreign_keys(
-        self, db: AsyncSession, payload: RawQuestionPayload
-    ) -> dict[str, Any] | None:
-        """Resolve (ou cria) Board/Subject/Exam/State a partir dos nomes
-        textuais extraídos, retornando os IDs necessários para a Question."""
-        from backend.models.taxonomy import Board, Exam, State, Subject
-        from sqlalchemy import select
-
-        board_slug = normalize_board_name(payload.board_name)
-        if not board_slug or not payload.subject_name or not payload.organization:
-            return None
-
-        board = (
-            await db.execute(select(Board).where(Board.slug == board_slug))
-        ).scalar_one_or_none()
-        if board is None:
-            board = Board(name=payload.board_name.strip(), slug=board_slug, aliases=[board_slug])
-            db.add(board)
-            await db.flush()
-
-        subject_slug = _strip_accents(payload.subject_name.strip().lower()).replace(" ", "-")
-        subject = (
-            await db.execute(select(Subject).where(Subject.slug == subject_slug))
-        ).scalar_one_or_none()
-        if subject is None:
-            subject = Subject(name=payload.subject_name.strip(), slug=subject_slug)
-            db.add(subject)
-            await db.flush()
-
-        exam = (
-            await db.execute(
-                select(Exam).where(
-                    Exam.organization == payload.organization,
-                    Exam.year == payload.year,
-                    Exam.role == payload.role,
-                )
-            )
-        ).scalar_one_or_none()
-        if exam is None:
-            exam = Exam(
-                name=f"{payload.organization} {payload.year}",
-                organization=payload.organization.strip(),
-                role=payload.role,
-                year=payload.year,
-            )
-            db.add(exam)
-            await db.flush()
-
-        state_id = None
-        if payload.state_uf:
-            uf = payload.state_uf.strip().upper()
-            state = (
-                await db.execute(select(State).where(State.uf == uf))
-            ).scalar_one_or_none()
-            if state is None and uf in BRAZILIAN_STATE_NAMES:
-                state = State(name=BRAZILIAN_STATE_NAMES[uf], uf=uf)
-                db.add(state)
-                await db.flush()
-            if state is not None:
-                state_id = state.id
-
-        return {
-            "board_id": board.id,
-            "subject_id": subject.id,
-            "exam_id": exam.id,
-            "state_id": state_id,
-        }
 
     async def run(self, source_urls: list[str]) -> ScrapeResult:
         result = ScrapeResult()
@@ -331,7 +306,7 @@ class ScraperService:
                     result.duplicates_in_batch += 1
                     continue
 
-                fk_ids = await self._resolve_foreign_keys(db, payload)
+                fk_ids = await resolve_foreign_keys(db, payload)
                 if fk_ids is None:
                     result.invalid += 1
                     continue
@@ -342,7 +317,7 @@ class ScraperService:
                         "options": payload.options,
                         "correct_option": payload.correct_option,
                         "year": payload.year,
-                        "difficulty_level": classify_difficulty(payload),
+                        "difficulty_level": payload.difficulty_level or classify_difficulty(payload),
                         "content_hash": content_hash,
                         "source_url": payload.source_url,
                         **fk_ids,

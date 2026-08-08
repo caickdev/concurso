@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { api } from "./api/client";
 import { useTheme } from "./hooks/useTheme";
+import AdminAddQuestionForm from "./components/AdminAddQuestionForm.jsx";
 import AuthForm from "./components/AuthForm.jsx";
 import ResetPasswordForm from "./components/ResetPasswordForm.jsx";
 import Sidebar from "./components/Sidebar.jsx";
@@ -73,6 +74,7 @@ export default function App() {
             {view === "dashboard" && <StudentDashboard user={user} onUserChange={setUser} />}
             {view === "notebook" && <NotebookPage />}
             {view === "profile" && <ProfilePage user={user} onUserChange={setUser} />}
+            {view === "admin" && user.is_admin && <AdminAddQuestionForm />}
           </main>
         </div>
       ) : (

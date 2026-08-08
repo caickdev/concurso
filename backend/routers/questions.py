@@ -1,10 +1,13 @@
+import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import settings
+from backend.core.deps import require_admin
 from backend.core.rate_limit import limiter
 from backend.core.security import get_current_user_id
 from backend.crud.crud_answer import crud_answer
@@ -17,6 +20,8 @@ from backend.schemas.question import (
     AIExplanationResponse,
     QuestionAnswerResult,
     QuestionAnswerSubmit,
+    QuestionBatchRequest,
+    QuestionBatchResult,
     QuestionDetail,
     QuestionFilterParams,
     QuestionListItem,
@@ -24,6 +29,14 @@ from backend.schemas.question import (
 from backend.services import cache
 from backend.services.ai_tutor_service import ai_tutor_service
 from backend.services.gamification_service import calculate_xp
+from backend.services.scraper_service import (
+    classify_difficulty,
+    compute_content_hash,
+    resolve_foreign_keys,
+    sanitize_html,
+)
+
+logger = logging.getLogger("questions_batch")
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -60,6 +73,84 @@ async def filter_questions(
         serializer=_serialize,
         deserializer=_deserialize,
     )
+
+
+@router.post("/batch", response_model=QuestionBatchResult, status_code=status.HTTP_201_CREATED)
+async def create_questions_batch(
+    payload: QuestionBatchRequest,
+    _admin_id: uuid.UUID = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ingestão em lote de questões — só administradores. Reaproveita a mesma
+    lógica de deduplicação e resolução de taxonomia do scraper
+    (services/scraper_service.py): o hash SHA256 de enunciado+alternativas é
+    a chave de deduplicação real (única e indexada no banco), garantida via
+    `INSERT ... ON CONFLICT DO NOTHING` em uma única viagem ao banco — mais
+    robusto que uma checagem prévia em nível de aplicação, que teria uma
+    janela de corrida sob inserções concorrentes.
+
+    Limitado a 200 questões por chamada (schemas/question.py) para não
+    estourar o tempo máximo de execução da função na Vercel; volumes maiores
+    devem usar scripts/insert_questions.py, que roda fora do processo web.
+    """
+    result = QuestionBatchResult(received=len(payload.questions), invalid=0, duplicates=0, inserted=0)
+    seen_hashes_in_batch: set[str] = set()
+    rows: list[dict[str, Any]] = []
+
+    for item in payload.questions:
+        try:
+            clean_content = sanitize_html(item.content)
+            clean_options = {k: sanitize_html(v) for k, v in item.options.items()}
+            content_hash = compute_content_hash(clean_content, clean_options)
+
+            if content_hash in seen_hashes_in_batch:
+                result.duplicates += 1
+                continue
+            seen_hashes_in_batch.add(content_hash)
+
+            existing = await crud_question.get_by_content_hash(db, content_hash)
+            if existing is not None:
+                result.duplicates += 1
+                continue
+
+            fk_ids = await resolve_foreign_keys(db, item)
+            if fk_ids is None:
+                result.invalid += 1
+                result.errors.append(f"Banca/matéria/órgão inválidos: {clean_content[:60]}...")
+                continue
+
+            rows.append(
+                {
+                    "content": clean_content,
+                    "options": clean_options,
+                    "correct_option": item.correct_option,
+                    "year": item.year,
+                    "difficulty_level": item.difficulty_level or classify_difficulty(item),
+                    "content_hash": content_hash,
+                    "source_url": item.source_url,
+                    **fk_ids,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001 — um item malformado não pode derrubar o lote inteiro
+            result.invalid += 1
+            result.errors.append(str(exc))
+            logger.warning("Item inválido no lote de questões: %s", exc)
+
+    if rows:
+        result.inserted = await crud_question.bulk_insert_questions(db, rows)
+        # bulk_insert_questions conta linhas efetivamente inseridas; a
+        # diferença para len(rows) são colisões de content_hash que só o
+        # ON CONFLICT do banco pegou (corrida entre requests concorrentes).
+        result.duplicates += len(rows) - result.inserted
+
+    if result.inserted > 0:
+        await cache.delete_by_prefix("questions:filter:")
+
+    logger.info(
+        "Lote de questões: recebido=%d inserido=%d duplicadas=%d inválidas=%d",
+        result.received, result.inserted, result.duplicates, result.invalid,
+    )
+    return result
 
 
 @router.get("/{question_id}", response_model=QuestionDetail)

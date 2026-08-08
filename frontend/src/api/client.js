@@ -68,6 +68,7 @@ export const api = {
       request(`/questions/${id}/answer`, { method: "POST", body: payload }),
     explainAI: (id, payload) =>
       request(`/questions/${id}/explain-ai`, { method: "POST", body: payload }),
+    batch: (questions) => request("/questions/batch", { method: "POST", body: { questions } }),
   },
   comments: {
     list: (questionId) => request(`/questions/${questionId}/comments`),
