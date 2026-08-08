@@ -148,7 +148,11 @@ def _extract_json_array(text: str) -> list[dict[str, Any]]:
     match = re.search(r"\[.*\]", text, re.DOTALL)
     if not match:
         raise ValueError("Nenhum array JSON encontrado na resposta do modelo.")
-    return json.loads(match.group(0))
+    # strict=False: o modelo às vezes emite quebras de linha literais (não
+    # escapadas como \n) dentro de valores de string — comum em itens de
+    # Português que citam um trecho de texto multilinha. json em modo
+    # estrito rejeita esses caracteres de controle; strict=False os aceita.
+    return json.loads(match.group(0), strict=False)
 
 
 async def _generate_chunk(
