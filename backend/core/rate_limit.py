@@ -27,7 +27,12 @@ limiter = Limiter(
     key_func=user_or_ip_key,
     storage_uri=settings.RATE_LIMIT_STORAGE_URI or str(settings.REDIS_URL),
     default_limits=[settings.RATE_LIMIT_DEFAULT],
-    headers_enabled=True,
+    # headers_enabled=False: com swallow_errors=True, quando a checagem de
+    # limite é pulada (Redis indisponível), o SlowAPI não popula
+    # request.state.view_rate_limit — e o middleware de headers tenta lê-lo
+    # incondicionalmente ao montar a resposta, causando AttributeError e
+    # derrubando a requisição mesmo com o erro original já "engolido".
+    headers_enabled=False,
     # swallow_errors=True: se o Redis estiver indisponível/mal configurado, o
     # rate limiter deve deixar a requisição passar sem limitar, nunca derrubar
     # a aplicação inteira (mesmo princípio "fail-open" do services/cache.py).
