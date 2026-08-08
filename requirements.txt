@@ -1,4 +1,38 @@
 # A Vercel procura requirements.txt na raiz do projeto (Root Directory) para
-# instalar as dependências das Serverless Functions em /api. O conteúdo real
-# vive em backend/requirements.txt (fonte única também usada localmente/Docker).
--r backend/requirements.txt
+# instalar as dependências das Serverless Functions em /api. O parser da
+# Vercel é mais simples que o pip: NÃO suporta a diretiva "-r outro_arquivo",
+# por isso este arquivo precisa ser uma cópia completa (não um include) de
+# backend/requirements.txt. Ao mudar uma dependência lá, replique aqui.
+
+# --- Framework & Servidor ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# --- Banco de Dados ---
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+alembic==1.13.2
+pgvector==0.3.4
+
+# --- Cache & Rate Limiting ---
+redis==5.0.8
+slowapi==0.1.9
+
+# --- Segurança ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+bleach==6.1.0
+
+# --- Configuração & Validação ---
+pydantic==2.9.2
+pydantic-settings==2.5.2
+email-validator==2.2.0
+
+# --- Scraping / ETL ---
+httpx==0.27.2
+beautifulsoup4==4.12.3
+playwright==1.47.0
+
+# --- Tutor IA ---
+anthropic==0.34.2
