@@ -126,6 +126,10 @@ async def insert_all(payloads: list[RawQuestionPayload]) -> tuple[int, int, int]
 
         if inserted > 0:
             await cache.delete_by_prefix("questions:filter:")
+            # resolve_foreign_keys pode ter criado banca/matéria/órgão/estado
+            # novos (get-or-create) — sem isso, /subjects, /boards e /states
+            # continuam servindo a lista antiga do Redis por até 1h.
+            await cache.delete("taxonomy:subjects", "taxonomy:boards", "taxonomy:states")
 
     return inserted, duplicates, invalid
 

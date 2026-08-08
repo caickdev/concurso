@@ -145,6 +145,11 @@ async def create_questions_batch(
 
     if result.inserted > 0:
         await cache.delete_by_prefix("questions:filter:")
+        # resolve_foreign_keys pode ter criado banca/matéria/órgão/estado
+        # novos (get-or-create) — sem isso, /subjects, /boards e /states
+        # continuam servindo a lista antiga do Redis por até 1h (TTL de
+        # routers/taxonomy.py).
+        await cache.delete("taxonomy:subjects", "taxonomy:boards", "taxonomy:states")
 
     logger.info(
         "Lote de questões: recebido=%d inserido=%d duplicadas=%d inválidas=%d",
