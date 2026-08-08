@@ -1,7 +1,7 @@
-"""Popula o banco com dados de demonstração: taxonomia (estado, bancas,
-matérias, um concurso de exemplo por banca) e um pequeno conjunto de
-questões — todas de autoria original deste projeto, escritas para
-demonstrar o formato de cada banca (CEBRASPE Certo/Errado, FGV e FCC A-E).
+"""Popula o banco com dados de demonstração: taxonomia (estados, bancas,
+matérias, um concurso de exemplo por banca) e um conjunto de questões —
+todas de autoria original deste projeto, escritas para demonstrar o formato
+de cada banca (CEBRASPE Certo/Errado; FGV, FCC e VUNESP A-E/A-D).
 Nenhum conteúdo foi extraído de prova real.
 
 Não substitui o scraper (services/scraper_service.py) — é só para o site
@@ -207,23 +207,196 @@ _QUESTIONS: list[dict[str, Any]] = [
         "options": {"A": "36", "B": "40", "C": "42", "D": "44", "E": "48"},
         "correct_option": "C",
     },
+    {
+        "board": "fcc", "subject": "raciocinio-logico",
+        "difficulty": DifficultyLevel.MEDIUM,
+        "content": (
+            "Em uma turma de concurseiros, sabe-se que todo aluno que estuda Direito "
+            "Constitucional também estuda Português, e sabe-se que João não estuda "
+            "Português. É correto concluir que:"
+        ),
+        "options": {
+            "A": "João estuda Direito Constitucional",
+            "B": "João não estuda Direito Constitucional",
+            "C": "João estuda todas as matérias, exceto Português",
+            "D": "Não é possível concluir nada sobre os estudos de João",
+            "E": "Todos os alunos da turma estudam Direito Constitucional",
+        },
+        "correct_option": "B",
+    },
+    # --- VUNESP (A-D) — Informática ---
+    {
+        "board": "vunesp", "subject": "informatica", "state_uf": "SP",
+        "difficulty": DifficultyLevel.EASY,
+        "content": (
+            "No Microsoft Excel, a fórmula =SE(A1>10;\"Alto\";\"Baixo\") foi inserida "
+            "em uma célula, e a célula A1 contém o valor 15. Assinale a alternativa "
+            "que apresenta o resultado exibido:"
+        ),
+        "options": {"A": "Alto", "B": "Baixo", "C": "#VALOR!", "D": "15"},
+        "correct_option": "A",
+    },
+    {
+        "board": "vunesp", "subject": "informatica", "state_uf": "SP",
+        "difficulty": DifficultyLevel.MEDIUM,
+        "content": (
+            "Assinale a alternativa que apresenta corretamente a função de um "
+            "firewall em uma rede de computadores:"
+        ),
+        "options": {
+            "A": "Armazenar cópias de segurança dos dados da rede",
+            "B": "Controlar o tráfego de rede com base em regras de segurança predefinidas",
+            "C": "Aumentar a velocidade de conexão à internet",
+            "D": "Traduzir nomes de domínio em endereços IP",
+        },
+        "correct_option": "B",
+    },
+    {
+        "board": "vunesp", "subject": "informatica", "state_uf": "SP",
+        "difficulty": DifficultyLevel.HARD,
+        "content": (
+            "Em relação aos modelos de computação em nuvem, aquele em que o usuário "
+            "contrata apenas a infraestrutura (servidores, armazenamento e rede), "
+            "ficando responsável por instalar e gerenciar o sistema operacional e as "
+            "aplicações, é denominado:"
+        ),
+        "options": {
+            "A": "SaaS (Software as a Service)",
+            "B": "PaaS (Platform as a Service)",
+            "C": "IaaS (Infrastructure as a Service)",
+            "D": "DaaS (Desktop as a Service)",
+        },
+        "correct_option": "C",
+    },
+    # --- VUNESP (A-D) — Administração Pública ---
+    {
+        "board": "vunesp", "subject": "administracao-publica", "state_uf": "SP",
+        "difficulty": DifficultyLevel.MEDIUM,
+        "content": (
+            "Segundo a classificação clássica da doutrina administrativista, os "
+            "órgãos públicos que atuam com autonomia técnica e decisória, mas sem "
+            "personalidade jurídica própria distinta do ente a que pertencem, são "
+            "denominados:"
+        ),
+        "options": {
+            "A": "Entidades da administração indireta",
+            "B": "Órgãos públicos",
+            "C": "Empresas públicas",
+            "D": "Autarquias",
+        },
+        "correct_option": "B",
+    },
+    {
+        "board": "vunesp", "subject": "administracao-publica", "state_uf": "SP",
+        "difficulty": DifficultyLevel.MEDIUM,
+        "content": "Sobre os poderes administrativos, assinale a alternativa correta:",
+        "options": {
+            "A": "O poder disciplinar permite à Administração aplicar sanções a qualquer cidadão que descumpra normas administrativas",
+            "B": "O poder hierárquico decorre da relação de subordinação entre os órgãos e agentes do Poder Executivo",
+            "C": "O poder de polícia é exclusivo do Poder Judiciário",
+            "D": "O poder regulamentar é exercido exclusivamente pelo Poder Legislativo",
+        },
+        "correct_option": "B",
+    },
+    # --- CEBRASPE (Certo/Errado) — Direito Penal ---
+    {
+        "board": "cebraspe", "subject": "direito-penal",
+        "difficulty": DifficultyLevel.HARD,
+        "content": (
+            "Acerca dos princípios do Direito Penal, julgue o item: o princípio da "
+            "legalidade penal veda a criação de crimes e penas por meio de analogia, "
+            "ainda que em benefício do réu."
+        ),
+        "options": {"C": "Certo", "E": "Errado"},
+        "correct_option": "E",
+    },
+    {
+        "board": "cebraspe", "subject": "direito-penal",
+        "difficulty": DifficultyLevel.MEDIUM,
+        "content": (
+            "Julgue o item: para a configuração do crime de furto, é indispensável "
+            "que a subtração da coisa alheia móvel ocorra mediante violência ou "
+            "grave ameaça à pessoa."
+        ),
+        "options": {"C": "Certo", "E": "Errado"},
+        "correct_option": "E",
+    },
+    # --- CEBRASPE (Certo/Errado) — Matemática Financeira ---
+    {
+        "board": "cebraspe", "subject": "matematica-financeira",
+        "difficulty": DifficultyLevel.EASY,
+        "content": (
+            "Julgue o item: no regime de juros simples, os juros incidem sempre "
+            "sobre o capital inicial, não havendo incidência de juros sobre juros "
+            "já acumulados."
+        ),
+        "options": {"C": "Certo", "E": "Errado"},
+        "correct_option": "C",
+    },
+    {
+        "board": "cebraspe", "subject": "matematica-financeira",
+        "difficulty": DifficultyLevel.HARD,
+        "content": (
+            "Julgue o item: em um financiamento pelo Sistema de Amortização "
+            "Constante (SAC), o valor das prestações mensais permanece constante ao "
+            "longo de todo o período de pagamento."
+        ),
+        "options": {"C": "Certo", "E": "Errado"},
+        "correct_option": "E",
+    },
+    # --- FGV (A-E) — Administração Pública ---
+    {
+        "board": "fgv", "subject": "administracao-publica",
+        "difficulty": DifficultyLevel.MEDIUM,
+        "content": (
+            "Segundo o ciclo PDCA (Plan-Do-Check-Act), amplamente utilizado na "
+            "gestão de processos organizacionais, a etapa em que se compara o "
+            "resultado obtido com a meta planejada é denominada:"
+        ),
+        "options": {
+            "A": "Plan (Planejar)",
+            "B": "Do (Executar)",
+            "C": "Check (Verificar)",
+            "D": "Act (Agir)",
+            "E": "Nenhuma das etapas anteriores",
+        },
+        "correct_option": "C",
+    },
+    {
+        "board": "fgv", "subject": "administracao-publica",
+        "difficulty": DifficultyLevel.MEDIUM,
+        "content": "Sobre os tipos de planejamento organizacional, assinale a alternativa correta:",
+        "options": {
+            "A": "O planejamento estratégico é de curto prazo e envolve apenas o nível operacional",
+            "B": "O planejamento tático traduz as diretrizes do planejamento estratégico em objetivos específicos por departamento ou área",
+            "C": "O planejamento operacional define a missão e a visão da organização",
+            "D": "O planejamento estratégico é elaborado exclusivamente pelo nível operacional",
+            "E": "Não há relação entre os níveis estratégico, tático e operacional de planejamento",
+        },
+        "correct_option": "B",
+    },
 ]
 
-_BOARD_NAMES = {"cebraspe": "CEBRASPE", "fgv": "FGV", "fcc": "FCC"}
+_BOARD_NAMES = {"cebraspe": "CEBRASPE", "fgv": "FGV", "fcc": "FCC", "vunesp": "VUNESP"}
 _SUBJECT_NAMES = {
     "direito-constitucional": "Direito Constitucional",
     "direito-administrativo": "Direito Administrativo",
     "portugues": "Português",
     "raciocinio-logico": "Raciocínio Lógico",
+    "informatica": "Informática",
+    "administracao-publica": "Administração Pública",
+    "direito-penal": "Direito Penal",
+    "matematica-financeira": "Matemática Financeira",
 }
+_STATE_NAMES = {"BR": "Federal", "SP": "São Paulo"}
 _EXAM_YEAR = 2026
 _EXAM_ORG = "Órgão de Exemplo (dados de demonstração)"
 
 
-async def _get_or_create_state(db) -> State:
-    state = (await db.execute(select(State).where(State.uf == "BR"))).scalar_one_or_none()
+async def _get_or_create_state(db, uf: str) -> State:
+    state = (await db.execute(select(State).where(State.uf == uf))).scalar_one_or_none()
     if state is None:
-        state = State(name="Federal", uf="BR")
+        state = State(name=_STATE_NAMES[uf], uf=uf)
         db.add(state)
         await db.flush()
     return state
@@ -268,13 +441,12 @@ async def _get_or_create_exam(db, board: Board) -> Exam:
 async def seed() -> int:
     inserted = 0
     async with get_db_context() as db:
-        state = await _get_or_create_state(db)
-
         rows: list[dict[str, Any]] = []
         for item in _QUESTIONS:
             board = await _get_or_create_board(db, item["board"])
             subject = await _get_or_create_subject(db, item["subject"])
             exam = await _get_or_create_exam(db, board)
+            state = await _get_or_create_state(db, item.get("state_uf", "BR"))
 
             content_hash = compute_content_hash(item["content"], item["options"])
             rows.append(
