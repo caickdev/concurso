@@ -28,5 +28,9 @@ limiter = Limiter(
     storage_uri=settings.RATE_LIMIT_STORAGE_URI or str(settings.REDIS_URL),
     default_limits=[settings.RATE_LIMIT_DEFAULT],
     headers_enabled=True,
-    swallow_errors=False,
+    # swallow_errors=True: se o Redis estiver indisponível/mal configurado, o
+    # rate limiter deve deixar a requisição passar sem limitar, nunca derrubar
+    # a aplicação inteira (mesmo princípio "fail-open" do services/cache.py).
+    # Sem isso, um Redis fora do ar tira o site inteiro do ar.
+    swallow_errors=True,
 )
