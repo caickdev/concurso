@@ -45,7 +45,18 @@ class Base(DeclarativeBase):
     pass
 
 
-IS_SERVERLESS = bool(os.environ.get("VERCEL")) or settings.DB_FORCE_NULLPOOL
+# Checa múltiplos sinais de ambiente serverless em vez de depender de um só:
+# VERCEL / VERCEL_ENV são injetadas automaticamente pela Vercel, mas exigem
+# "Automatically expose System Environment Variables" habilitado no projeto
+# para chegarem até a função Python — não confiável sozinho. Combina com
+# AWS_LAMBDA_FUNCTION_NAME (a Vercel roda funções Python sobre Lambda) e o
+# flag manual DB_FORCE_NULLPOOL como garantias adicionais.
+IS_SERVERLESS = bool(
+    os.environ.get("VERCEL")
+    or os.environ.get("VERCEL_ENV")
+    or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+    or settings.DB_FORCE_NULLPOOL
+)
 
 _engine_kwargs: dict[str, Any] = {
     "echo": settings.DB_ECHO,
