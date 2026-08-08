@@ -115,7 +115,9 @@ SUBJECTS: list[SubjectSpec] = [
             "formal, sobre tecnologia da informação, cibersegurança ou geopolítica internacional. "
             "Avalie exclusivamente aspectos linguísticos do trecho — reescrita mantendo o sentido "
             "original, regência, concordância, pontuação, coesão referencial/sequencial — nunca o "
-            "conteúdo factual do texto."
+            "conteúdo factual do texto. IMPORTANTE: ao citar o trecho dentro do campo \"content\", "
+            "use aspas curvas (“ ”) para demarcá-lo, nunca aspas retas (\") — aspas retas dentro do "
+            "valor de uma string quebram o JSON de saída."
         ),
     ),
 ]
@@ -127,7 +129,9 @@ _SYSTEM_PROMPT = (
     "exceções, não apenas memorização direta. Nunca copie questões de provas reais; toda redação "
     "deve ser autoral. Responda SOMENTE com um array JSON válido, sem texto fora do JSON, no "
     'formato: [{"content": "<enunciado do item>", "correct_option": "C"|"E", '
-    '"justification": "<1-2 frases justificando o gabarito>"}, ...].'
+    '"justification": "<1-2 frases justificando o gabarito>"}, ...]. Nunca use aspas retas (") '
+    "dentro do texto de um campo — isso invalida o JSON. Se precisar demarcar uma citação ou "
+    "expressão, use aspas curvas (“ ”)."
 )
 
 
@@ -148,11 +152,28 @@ def _extract_json_array(text: str) -> list[dict[str, Any]]:
     match = re.search(r"\[.*\]", text, re.DOTALL)
     if not match:
         raise ValueError("Nenhum array JSON encontrado na resposta do modelo.")
-    # strict=False: o modelo às vezes emite quebras de linha literais (não
-    # escapadas como \n) dentro de valores de string — comum em itens de
-    # Português que citam um trecho de texto multilinha. json em modo
-    # estrito rejeita esses caracteres de controle; strict=False os aceita.
-    return json.loads(match.group(0), strict=False)
+    array_text = match.group(0)
+    try:
+        # strict=False: o modelo às vezes emite quebras de linha literais (não
+        # escapadas como \n) dentro de valores de string — comum em itens de
+        # Português que citam um trecho de texto multilinha. json em modo
+        # estrito rejeita esses caracteres de controle; strict=False os aceita.
+        return json.loads(array_text, strict=False)
+    except json.JSONDecodeError:
+        # Um único item malformado (ex.: aspas retas não escapadas dentro de
+        # uma citação) invalida o parsing do array inteiro. Em vez de
+        # descartar o lote todo, tenta parsear cada objeto {...} isoladamente
+        # e aproveita os itens válidos — assume schema plano (sem chaves
+        # aninhadas), o que vale para RawQuestionPayload.
+        items: list[dict[str, Any]] = []
+        for obj_match in re.finditer(r"\{[^{}]*\}", array_text, re.DOTALL):
+            try:
+                items.append(json.loads(obj_match.group(0), strict=False))
+            except json.JSONDecodeError:
+                continue
+        if not items:
+            raise
+        return items
 
 
 async def _generate_chunk(
