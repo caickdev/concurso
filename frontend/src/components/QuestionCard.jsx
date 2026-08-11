@@ -153,8 +153,12 @@ export default function QuestionCard({ question, onAnswered, onAddToNotebook, in
             <span className={result.is_correct ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-rose-700 dark:text-rose-400"}>
               {result.is_correct ? "Você acertou!" : "Você errou."}
             </span>
-            <span className="text-slate-500 dark:text-slate-400">XP: {result.xp_earned >= 0 ? "+" : ""}{result.xp_earned}</span>
-            <span className="text-slate-500 dark:text-slate-400">Sequência: {result.current_streak} dias</span>
+            {result.xp_earned != null && (
+              <span className="text-slate-500 dark:text-slate-400">XP: {result.xp_earned >= 0 ? "+" : ""}{result.xp_earned}</span>
+            )}
+            {result.current_streak != null && (
+              <span className="text-slate-500 dark:text-slate-400">Sequência: {result.current_streak} dias</span>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap">

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.config import settings
 from backend.core.deps import require_admin
 from backend.core.rate_limit import limiter
-from backend.core.security import get_current_user_id
+from backend.core.security import get_current_user_id, get_current_user_id_optional
 from backend.crud.crud_answer import crud_answer
 from backend.crud.crud_question import crud_question
 from backend.crud.crud_user import crud_user
@@ -44,13 +44,19 @@ router = APIRouter(prefix="/questions", tags=["questions"])
 @router.get("/filter", response_model=Page[QuestionListItem])
 async def filter_questions(
     params: QuestionFilterParams = Depends(),
+    user_id: uuid.UUID | None = Depends(get_current_user_id_optional),
     db: AsyncSession = Depends(get_db),
 ):
     """Filtro dinâmico (estado, banca, matéria, ano, dificuldade) — read-through
-    no Redis para não bater no Postgres a cada request repetida."""
+    no Redis para não bater no Postgres a cada request repetida.
+
+    Para usuário autenticado, questões que ele já respondeu nunca aparecem
+    aqui de novo (ver crud_question._apply_filters) — o histórico completo,
+    separado em certas/erradas, fica em GET /users/me/answers. O cache é
+    segmentado por usuário nesse caso (params.cache_key(user_id))."""
 
     async def _load():
-        items, total = await crud_question.filter_questions(db, params)
+        items, total = await crud_question.filter_questions(db, params, user_id)
         page_data = Page[QuestionListItem](
             items=[QuestionListItem.model_validate(i) for i in items],
             total=total,
@@ -67,7 +73,7 @@ async def filter_questions(
         return Page[QuestionListItem].model_validate(raw)
 
     return await cache.read_through(
-        key=params.cache_key(),
+        key=params.cache_key(user_id),
         ttl=settings.CACHE_TTL_FILTERS,
         loader=_load,
         serializer=_serialize,
@@ -212,6 +218,10 @@ async def submit_answer(
     user = await crud_user.register_activity_and_grant_xp(db, user, xp_earned)
 
     await cache.delete_by_prefix("leaderboard:top:")
+    # Sem isso, listagens de "não respondidas" já cacheadas para este usuário
+    # continuariam incluindo a questão que ele acabou de responder por até
+    # CACHE_TTL_FILTERS.
+    await cache.delete_by_prefix(f"questions:filter:user:{user_id}:")
 
     return QuestionAnswerResult(
         question_id=question.id,

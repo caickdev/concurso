@@ -1,12 +1,13 @@
 import uuid
 from typing import Any, Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from backend.crud.base import CRUDBase
+from backend.models.answer import UserAnswer
 from backend.models.question import Question
 from backend.schemas.question import QuestionFilterParams
 
@@ -30,7 +31,9 @@ class CRUDQuestion(CRUDBase[Question]):
         )
         return result.scalar_one_or_none()
 
-    def _apply_filters(self, stmt, params: QuestionFilterParams):
+    def _apply_filters(
+        self, stmt, params: QuestionFilterParams, user_id: uuid.UUID | None = None
+    ):
         if params.state_id:
             stmt = stmt.where(Question.state_id == params.state_id)
         if params.board_id:
@@ -43,17 +46,27 @@ class CRUDQuestion(CRUDBase[Question]):
             stmt = stmt.where(Question.year == params.year)
         if params.difficulty_level:
             stmt = stmt.where(Question.difficulty_level == params.difficulty_level)
+        if user_id is not None:
+            # Usuário autenticado: nunca mostra de novo uma questão que ele já
+            # respondeu — o histórico completo (certas/erradas) fica
+            # disponível separadamente em GET /users/me/answers.
+            stmt = stmt.where(
+                ~exists().where(
+                    UserAnswer.question_id == Question.id,
+                    UserAnswer.user_id == user_id,
+                )
+            )
         return stmt
 
     async def filter_questions(
-        self, db: AsyncSession, params: QuestionFilterParams
+        self, db: AsyncSession, params: QuestionFilterParams, user_id: uuid.UUID | None = None
     ) -> tuple[Sequence[Question], int]:
         """Consulta filtrada e paginada. Usa o índice composto
         ix_questions_filter_composite para evitar full scan sob os filtros
         mais comuns. Só é chamada em cache miss (ver services/cache.py)."""
-        base_stmt = self._apply_filters(select(Question), params)
+        base_stmt = self._apply_filters(select(Question), params, user_id)
 
-        count_stmt = self._apply_filters(select(func.count(Question.id)), params)
+        count_stmt = self._apply_filters(select(func.count(Question.id)), params, user_id)
         total = (await db.execute(count_stmt)).scalar_one()
 
         stmt = (

@@ -4,10 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.security import get_current_user_id
+from backend.crud.crud_answer import crud_answer
 from backend.crud.crud_notebook import crud_notebook
 from backend.crud.crud_user import crud_user
 from backend.database import get_db
+from backend.schemas.answer import AnsweredQuestionFilterParams, AnsweredQuestionRead
+from backend.schemas.common import Page
 from backend.schemas.notebook import NotebookItemCreate, NotebookItemRead, NotebookItemUpdate
+from backend.schemas.question import QuestionListItem
 from backend.schemas.user import UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -32,6 +36,39 @@ async def update_me(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+# --- Histórico de respostas (Corretas/Erradas) ---
+
+@router.get("/me/answers", response_model=Page[AnsweredQuestionRead])
+async def list_answered_questions(
+    params: AnsweredQuestionFilterParams = Depends(),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Todas as questões que o usuário já respondeu, mais recentes primeiro —
+    já que /questions/filter nunca mais devolve uma questão respondida, este
+    é o único lugar para revê-la depois, com o gabarito exposto e filtrável
+    por acerto/erro (params.is_correct)."""
+    answers, total = await crud_answer.filter_by_user(db, user_id, params)
+    items = [
+        AnsweredQuestionRead(
+            id=answer.id,
+            question=QuestionListItem.model_validate(answer.question),
+            selected_option=answer.selected_option,
+            correct_option=answer.question.correct_option,
+            is_correct=answer.is_correct,
+            answered_at=answer.created_at,
+        )
+        for answer in answers
+    ]
+    return Page[AnsweredQuestionRead](
+        items=items,
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
+        total_pages=(total + params.page_size - 1) // params.page_size if total else 0,
+    )
 
 
 # --- Caderno de Erros ---

@@ -46,7 +46,7 @@ class QuestionFilterParams(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
-    def cache_key(self) -> str:
+    def cache_key(self, user_id: uuid.UUID | None = None) -> str:
         parts = [
             f"state={self.state_id}",
             f"board={self.board_id}",
@@ -57,7 +57,18 @@ class QuestionFilterParams(BaseModel):
             f"page={self.page}",
             f"size={self.page_size}",
         ]
-        return "questions:filter:" + "|".join(parts)
+        # Usuários autenticados têm suas questões já respondidas excluídas do
+        # resultado (ver crud_question.filter_questions), então o cache
+        # precisa ser segmentado por usuário — sem isso, o primeiro usuário a
+        # popular uma combinação de filtros no Redis "vazaria" sua lista
+        # (já sem as questões que ele respondeu) para todos os outros.
+        # Mantém o prefixo "questions:filter:" em ambos os casos para que
+        # `cache.delete_by_prefix("questions:filter:")` (nova questão
+        # inserida) continue invalidando tudo; o segmento "user:{id}:"
+        # adicional permite também invalidar só as chaves de um usuário
+        # específico após ele responder uma questão.
+        prefix = f"questions:filter:user:{user_id}:" if user_id else "questions:filter:"
+        return prefix + "|".join(parts)
 
 
 class QuestionListItem(ORMModel):

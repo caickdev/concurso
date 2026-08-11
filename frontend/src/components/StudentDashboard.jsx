@@ -46,6 +46,14 @@ export default function StudentDashboard({ user, onUserChange }) {
   const [activeTab, setActiveTab] = useState("pending");
   const transitionTimeouts = useRef(new Map());
 
+  // Aba "Respondidas": histórico completo (entre sessões, não só a página
+  // atual) vindo de GET /users/me/answers, separado em Corretas/Erradas.
+  const [answeredSubTab, setAnsweredSubTab] = useState("wrong");
+  const [answeredHistoryPage, setAnsweredHistoryPage] = useState(1);
+  const [answeredHistoryData, setAnsweredHistoryData] = useState(null);
+  const [loadingAnsweredHistory, setLoadingAnsweredHistory] = useState(false);
+  const [answeredHistoryError, setAnsweredHistoryError] = useState(null);
+
   useEffect(() => {
     const timeouts = transitionTimeouts.current;
     return () => {
@@ -81,6 +89,49 @@ export default function StudentDashboard({ user, onUserChange }) {
       cancelled = true;
     };
   }, [filters]);
+
+  useEffect(() => {
+    setAnsweredHistoryPage(1);
+  }, [answeredSubTab, filters.subject_id, filters.board_id, filters.year, filters.difficulty_level]);
+
+  useEffect(() => {
+    if (activeTab !== "answered") return undefined;
+    let cancelled = false;
+    setLoadingAnsweredHistory(true);
+    setAnsweredHistoryError(null);
+
+    api.users
+      .answers({
+        subject_id: filters.subject_id,
+        board_id: filters.board_id,
+        year: filters.year,
+        difficulty_level: filters.difficulty_level,
+        is_correct: answeredSubTab === "correct",
+        page: answeredHistoryPage,
+        page_size: 10,
+      })
+      .then((data) => {
+        if (!cancelled) setAnsweredHistoryData(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAnsweredHistoryError("Não foi possível carregar as questões respondidas.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAnsweredHistory(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeTab,
+    answeredSubTab,
+    answeredHistoryPage,
+    filters.subject_id,
+    filters.board_id,
+    filters.year,
+    filters.difficulty_level,
+  ]);
 
   const dailyGoalProgress = useMemo(() => {
     if (!user) return 0;
@@ -125,18 +176,15 @@ export default function StudentDashboard({ user, onUserChange }) {
     }
   };
 
-  // Contagens das abas refletem o estado real (não o transitório) para não
+  // Contagem da aba reflete o estado real (não o transitório) para não
   // confundir o usuário com números que "voltam atrás".
-  const answeredCount = questionPage?.items?.filter((q) => answeredResults[q.id]).length ?? 0;
-  const pendingCount = (questionPage?.items?.length ?? 0) - answeredCount;
+  const pendingCount = questionPage?.items?.filter((q) => !answeredResults[q.id]).length ?? 0;
 
-  // A lista da aba "Não respondidas" inclui, por mais alguns segundos, a
-  // última questão respondida (para mostrar o gabarito antes de sumir); a
-  // aba "Respondidas" já mostra a questão desde o primeiro instante.
+  // A lista inclui, por mais alguns segundos, a última questão respondida
+  // (para mostrar o gabarito antes de sumir) — ela já aparece no histórico
+  // da aba "Respondidas" (GET /users/me/answers) desde o primeiro instante.
   const pendingItems =
     questionPage?.items?.filter((q) => !answeredResults[q.id] || transitioningIds.has(q.id)) ?? [];
-  const answeredItems = questionPage?.items?.filter((q) => answeredResults[q.id]) ?? [];
-  const visibleItems = activeTab === "pending" ? pendingItems : answeredItems;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -218,96 +266,169 @@ export default function StudentDashboard({ user, onUserChange }) {
       </section>
 
       <section className="space-y-4">
-        {questionPage?.items?.length > 0 && (
-          <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setActiveTab("pending")}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                activeTab === "pending"
-                  ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              Não respondidas
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {pendingCount}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("answered")}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                activeTab === "answered"
-                  ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              Respondidas
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {answeredCount}
-              </span>
-            </button>
-          </div>
-        )}
-
-        {loadingQuestions && (
-          <div className="flex items-center justify-center gap-2 py-10 text-slate-500 dark:text-slate-400">
-            <Loader2 className="h-5 w-5 animate-spin" /> Carregando questões...
-          </div>
-        )}
-        {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-        {!loadingQuestions &&
-          visibleItems.map((question) => (
-            <div key={question.id}>
-              <QuestionCard
-                question={question}
-                initialResult={answeredResults[question.id]}
-                onAnswered={handleAnswered}
-                onAddToNotebook={handleAddToNotebook}
-              />
-              {activeTab === "pending" && transitioningIds.has(question.id) && (
-                <p className="mt-1.5 text-right text-xs text-slate-400 dark:text-slate-500">
-                  Movendo para a aba "Respondidas"...
-                </p>
-              )}
-            </div>
-          ))}
-        {!loadingQuestions && questionPage?.items?.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-            Nenhuma questão encontrada para os filtros selecionados.
-          </p>
-        )}
-        {!loadingQuestions && questionPage?.items?.length > 0 && visibleItems.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-            {activeTab === "pending"
-              ? "Você já respondeu todas as questões desta página."
-              : "Nenhuma questão respondida ainda nesta página."}
-          </p>
-        )}
-      </section>
-
-      {questionPage && questionPage.total_pages > 1 && (
-        <div className="flex justify-center gap-2">
+        <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
           <button
-            disabled={filters.page <= 1}
-            onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
+            type="button"
+            onClick={() => setActiveTab("pending")}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "pending"
+                ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
           >
-            Anterior
+            Não respondidas
+            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              {pendingCount}
+            </span>
           </button>
-          <span className="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">
-            Página {filters.page} de {questionPage.total_pages}
-          </span>
           <button
-            disabled={filters.page >= questionPage.total_pages}
-            onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
+            type="button"
+            onClick={() => setActiveTab("answered")}
+            className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "answered"
+                ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
           >
-            Próxima
+            Respondidas
           </button>
         </div>
-      )}
+
+        {activeTab === "pending" ? (
+          <>
+            {loadingQuestions && (
+              <div className="flex items-center justify-center gap-2 py-10 text-slate-500 dark:text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin" /> Carregando questões...
+              </div>
+            )}
+            {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+            {!loadingQuestions &&
+              pendingItems.map((question) => (
+                <div key={question.id}>
+                  <QuestionCard
+                    question={question}
+                    initialResult={answeredResults[question.id]}
+                    onAnswered={handleAnswered}
+                    onAddToNotebook={handleAddToNotebook}
+                  />
+                  {transitioningIds.has(question.id) && (
+                    <p className="mt-1.5 text-right text-xs text-slate-400 dark:text-slate-500">
+                      Movendo para a aba "Respondidas"...
+                    </p>
+                  )}
+                </div>
+              ))}
+            {!loadingQuestions && pendingItems.length === 0 && (
+              <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                {questionPage?.items?.length === 0
+                  ? "Nenhuma questão encontrada para os filtros selecionados."
+                  : "Você já respondeu todas as questões desta página."}
+              </p>
+            )}
+
+            {questionPage && questionPage.total_pages > 1 && (
+              <div className="flex justify-center gap-2">
+                <button
+                  disabled={filters.page <= 1}
+                  onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Anterior
+                </button>
+                <span className="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">
+                  Página {filters.page} de {questionPage.total_pages}
+                </span>
+                <button
+                  disabled={filters.page >= questionPage.total_pages}
+                  onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAnsweredSubTab("wrong")}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  answeredSubTab === "wrong"
+                    ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                    : "bg-slate-100 text-slate-500 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                Erradas
+              </button>
+              <button
+                type="button"
+                onClick={() => setAnsweredSubTab("correct")}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  answeredSubTab === "correct"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    : "bg-slate-100 text-slate-500 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                Corretas
+              </button>
+            </div>
+
+            {loadingAnsweredHistory && (
+              <div className="flex items-center justify-center gap-2 py-10 text-slate-500 dark:text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin" /> Carregando questões respondidas...
+              </div>
+            )}
+            {answeredHistoryError && (
+              <p className="text-sm text-rose-600 dark:text-rose-400">{answeredHistoryError}</p>
+            )}
+            {!loadingAnsweredHistory &&
+              answeredHistoryData?.items?.map((item) => (
+                <QuestionCard
+                  key={item.id}
+                  question={item.question}
+                  initialResult={{
+                    question_id: item.question.id,
+                    selected_option: item.selected_option,
+                    correct_option: item.correct_option,
+                    is_correct: item.is_correct,
+                  }}
+                  onAddToNotebook={handleAddToNotebook}
+                />
+              ))}
+            {!loadingAnsweredHistory && answeredHistoryData?.items?.length === 0 && (
+              <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                {answeredSubTab === "wrong"
+                  ? "Nenhuma questão errada por aqui ainda."
+                  : "Nenhuma questão certa por aqui ainda."}
+              </p>
+            )}
+
+            {answeredHistoryData && answeredHistoryData.total_pages > 1 && (
+              <div className="flex justify-center gap-2">
+                <button
+                  disabled={answeredHistoryPage <= 1}
+                  onClick={() => setAnsweredHistoryPage((prev) => prev - 1)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Anterior
+                </button>
+                <span className="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">
+                  Página {answeredHistoryPage} de {answeredHistoryData.total_pages}
+                </span>
+                <button
+                  disabled={answeredHistoryPage >= answeredHistoryData.total_pages}
+                  onClick={() => setAnsweredHistoryPage((prev) => prev + 1)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">

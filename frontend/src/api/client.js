@@ -55,6 +55,7 @@ export const api = {
   },
   users: {
     updateMe: (payload) => request("/users/me", { method: "PATCH", body: payload }),
+    answers: (params) => request("/users/me/answers", { params }),
     listNotebook: () => request("/users/me/notebook"),
     addToNotebook: (payload) => request("/users/me/notebook", { method: "POST", body: payload }),
     updateNotebookItem: (id, payload) =>
