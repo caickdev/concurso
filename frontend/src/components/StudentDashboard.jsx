@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Flame, ListFilter, Loader2, Target, Trophy } from "lucide-react";
 import { api } from "../api/client";
 import QuestionCard from "./QuestionCard.jsx";
@@ -12,6 +12,11 @@ const DIFFICULTY_OPTIONS = [
 
 const SELECT_CLASSES =
   "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+
+// Tempo que a questão recém-respondida continua visível na aba "Não
+// respondidas" (mostrando se acertou ou errou) antes de sumir de lá — ela já
+// aparece na aba "Respondidas" desde o primeiro instante.
+const ANSWER_TRANSITION_MS = 2500;
 
 /**
  * Painel principal do aluno: estatísticas de gamificação, filtros avançados
@@ -37,7 +42,17 @@ export default function StudentDashboard({ user, onUserChange }) {
   const [error, setError] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [answeredResults, setAnsweredResults] = useState({});
+  const [transitioningIds, setTransitioningIds] = useState(() => new Set());
   const [activeTab, setActiveTab] = useState("pending");
+  const transitionTimeouts = useRef(new Map());
+
+  useEffect(() => {
+    const timeouts = transitionTimeouts.current;
+    return () => {
+      timeouts.forEach(clearTimeout);
+      timeouts.clear();
+    };
+  }, []);
 
   useEffect(() => {
     api.leaderboard.get(5).then(setLeaderboard).catch(() => setLeaderboard([]));
@@ -78,10 +93,28 @@ export default function StudentDashboard({ user, onUserChange }) {
   };
 
   const handleAnswered = (result) => {
-    setAnsweredResults((prev) => ({ ...prev, [result.question_id]: result }));
+    const questionId = result.question_id;
+    setAnsweredResults((prev) => ({ ...prev, [questionId]: result }));
     onUserChange((prev) =>
       prev ? { ...prev, total_xp: result.total_xp, current_streak: result.current_streak } : prev
     );
+
+    // Mantém a questão visível na aba "Não respondidas" por mais alguns
+    // segundos — tempo suficiente para o usuário ver se acertou ou errou —
+    // antes de sumir de lá (ela já passa a existir na aba "Respondidas"
+    // imediatamente, então nunca fica invisível nas duas ao mesmo tempo).
+    setTransitioningIds((prev) => new Set(prev).add(questionId));
+    const existingTimeout = transitionTimeouts.current.get(questionId);
+    if (existingTimeout) clearTimeout(existingTimeout);
+    const timeoutId = setTimeout(() => {
+      setTransitioningIds((prev) => {
+        const next = new Set(prev);
+        next.delete(questionId);
+        return next;
+      });
+      transitionTimeouts.current.delete(questionId);
+    }, ANSWER_TRANSITION_MS);
+    transitionTimeouts.current.set(questionId, timeoutId);
   };
 
   const handleAddToNotebook = async (questionId) => {
@@ -92,7 +125,16 @@ export default function StudentDashboard({ user, onUserChange }) {
     }
   };
 
-  const pendingItems = questionPage?.items?.filter((q) => !answeredResults[q.id]) ?? [];
+  // Contagens das abas refletem o estado real (não o transitório) para não
+  // confundir o usuário com números que "voltam atrás".
+  const answeredCount = questionPage?.items?.filter((q) => answeredResults[q.id]).length ?? 0;
+  const pendingCount = (questionPage?.items?.length ?? 0) - answeredCount;
+
+  // A lista da aba "Não respondidas" inclui, por mais alguns segundos, a
+  // última questão respondida (para mostrar o gabarito antes de sumir); a
+  // aba "Respondidas" já mostra a questão desde o primeiro instante.
+  const pendingItems =
+    questionPage?.items?.filter((q) => !answeredResults[q.id] || transitioningIds.has(q.id)) ?? [];
   const answeredItems = questionPage?.items?.filter((q) => answeredResults[q.id]) ?? [];
   const visibleItems = activeTab === "pending" ? pendingItems : answeredItems;
 
@@ -189,7 +231,7 @@ export default function StudentDashboard({ user, onUserChange }) {
             >
               Não respondidas
               <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {pendingItems.length}
+                {pendingCount}
               </span>
             </button>
             <button
@@ -203,7 +245,7 @@ export default function StudentDashboard({ user, onUserChange }) {
             >
               Respondidas
               <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {answeredItems.length}
+                {answeredCount}
               </span>
             </button>
           </div>
@@ -217,13 +259,19 @@ export default function StudentDashboard({ user, onUserChange }) {
         {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         {!loadingQuestions &&
           visibleItems.map((question) => (
-            <QuestionCard
-              key={question.id}
-              question={question}
-              initialResult={answeredResults[question.id]}
-              onAnswered={handleAnswered}
-              onAddToNotebook={handleAddToNotebook}
-            />
+            <div key={question.id}>
+              <QuestionCard
+                question={question}
+                initialResult={answeredResults[question.id]}
+                onAnswered={handleAnswered}
+                onAddToNotebook={handleAddToNotebook}
+              />
+              {activeTab === "pending" && transitioningIds.has(question.id) && (
+                <p className="mt-1.5 text-right text-xs text-slate-400 dark:text-slate-500">
+                  Movendo para a aba "Respondidas"...
+                </p>
+              )}
+            </div>
           ))}
         {!loadingQuestions && questionPage?.items?.length === 0 && (
           <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
