@@ -25,10 +25,10 @@ const DIFFICULTY_LABELS = {
  * Cartão de questão: exibe enunciado + alternativas, permite responder (com
  * modo Cebraspe opcional), mostra o resultado e oferece explicação via Tutor IA.
  */
-export default function QuestionCard({ question, onAnswered, onAddToNotebook }) {
-  const [selectedOption, setSelectedOption] = useState(null);
+export default function QuestionCard({ question, onAnswered, onAddToNotebook, initialResult }) {
+  const [selectedOption, setSelectedOption] = useState(initialResult?.selected_option ?? null);
   const [cebraspeMode, setCebraspeMode] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(initialResult ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 

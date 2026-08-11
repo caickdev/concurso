@@ -36,6 +36,8 @@ export default function StudentDashboard({ user, onUserChange }) {
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [error, setError] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [answeredResults, setAnsweredResults] = useState({});
+  const [activeTab, setActiveTab] = useState("pending");
 
   useEffect(() => {
     api.leaderboard.get(5).then(setLeaderboard).catch(() => setLeaderboard([]));
@@ -76,6 +78,7 @@ export default function StudentDashboard({ user, onUserChange }) {
   };
 
   const handleAnswered = (result) => {
+    setAnsweredResults((prev) => ({ ...prev, [result.question_id]: result }));
     onUserChange((prev) =>
       prev ? { ...prev, total_xp: result.total_xp, current_streak: result.current_streak } : prev
     );
@@ -88,6 +91,10 @@ export default function StudentDashboard({ user, onUserChange }) {
       // Falha silenciosa aqui é aceitável: a ação principal (responder) já foi concluída.
     }
   };
+
+  const pendingItems = questionPage?.items?.filter((q) => !answeredResults[q.id]) ?? [];
+  const answeredItems = questionPage?.items?.filter((q) => answeredResults[q.id]) ?? [];
+  const visibleItems = activeTab === "pending" ? pendingItems : answeredItems;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -169,6 +176,39 @@ export default function StudentDashboard({ user, onUserChange }) {
       </section>
 
       <section className="space-y-4">
+        {questionPage?.items?.length > 0 && (
+          <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setActiveTab("pending")}
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                activeTab === "pending"
+                  ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Não respondidas
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                {pendingItems.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("answered")}
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                activeTab === "answered"
+                  ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Respondidas
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                {answeredItems.length}
+              </span>
+            </button>
+          </div>
+        )}
+
         {loadingQuestions && (
           <div className="flex items-center justify-center gap-2 py-10 text-slate-500 dark:text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" /> Carregando questões...
@@ -176,10 +216,11 @@ export default function StudentDashboard({ user, onUserChange }) {
         )}
         {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         {!loadingQuestions &&
-          questionPage?.items?.map((question) => (
+          visibleItems.map((question) => (
             <QuestionCard
               key={question.id}
               question={question}
+              initialResult={answeredResults[question.id]}
               onAnswered={handleAnswered}
               onAddToNotebook={handleAddToNotebook}
             />
@@ -187,6 +228,13 @@ export default function StudentDashboard({ user, onUserChange }) {
         {!loadingQuestions && questionPage?.items?.length === 0 && (
           <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
             Nenhuma questão encontrada para os filtros selecionados.
+          </p>
+        )}
+        {!loadingQuestions && questionPage?.items?.length > 0 && visibleItems.length === 0 && (
+          <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+            {activeTab === "pending"
+              ? "Você já respondeu todas as questões desta página."
+              : "Nenhuma questão respondida ainda nesta página."}
           </p>
         )}
       </section>
