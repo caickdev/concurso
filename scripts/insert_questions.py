@@ -120,9 +120,18 @@ async def insert_all(payloads: list[RawQuestionPayload]) -> tuple[int, int, int]
                 }
             )
 
-        if rows:
-            inserted = await crud_question.bulk_insert_questions(db, rows)
-            duplicates += len(rows) - inserted
+        # bulk_insert_questions monta um único INSERT com todas as linhas do
+        # lote; acima de ~3 mil linhas (11 colunas cada) isso estoura o
+        # limite de 32767 parâmetros por statement do asyncpg/Postgres, então
+        # o lote final é fatiado em pedaços menores antes de cada viagem ao
+        # banco (mesmo valor de scraper_service.SCRAPER_BATCH_SIZE).
+        from backend.core.config import settings
+
+        for i in range(0, len(rows), settings.SCRAPER_BATCH_SIZE):
+            chunk = rows[i : i + settings.SCRAPER_BATCH_SIZE]
+            chunk_inserted = await crud_question.bulk_insert_questions(db, chunk)
+            inserted += chunk_inserted
+            duplicates += len(chunk) - chunk_inserted
 
         if inserted > 0:
             await cache.delete_by_prefix("questions:filter:")
